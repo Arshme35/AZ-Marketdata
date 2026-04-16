@@ -1,96 +1,101 @@
 import yfinance as yf
-import pandas as pd
 import json
-import requests
-import io
-from datetime import datetime
 import time
+import math
 
-def get_total_market_tickers():
-    """Fetches the Nifty Total Market constituent list (~750 stocks)."""
-    url = "https://archives.nseindia.com/content/indices/ind_niftytotalmarketlist.csv"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        df = pd.read_csv(io.StringIO(response.text))
-        return [symbol + ".NS" for symbol in df['Symbol'].tolist()]
-    except Exception as e:
-        print(f"Failed to fetch Total Market list: {e}")
-        return ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "SBIN.NS"]
+# Built-in High-Liquidity Indian Market List (Bypasses NSE blocks entirely)
+CORE_TICKERS = [
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "BHARTIARTL.NS", "SBIN.NS", "INFY.NS", 
+    "LICI.NS", "ITC.NS", "HINDUNILVR.NS", "LT.NS", "BAJFINANCE.NS", "HCLTECH.NS", "MARUTI.NS", 
+    "SUNPHARMA.NS", "ADANIENT.NS", "KOTAKBANK.NS", "TITAN.NS", "ONGC.NS", "TATAMOTORS.NS", 
+    "NTPC.NS", "AXISBANK.NS", "DMART.NS", "ADANIPORTS.NS", "ULTRACEMCO.NS", "ASIANPAINT.NS", 
+    "COALINDIA.NS", "BAJAJFINSV.NS", "BAJAJ-AUTO.NS", "POWERGRID.NS", "NESTLEIND.NS", "WIPRO.NS", 
+    "M&M.NS", "IOC.NS", "JIOFIN.NS", "HAL.NS", "DLF.NS", "ADANIPOWER.NS", "JSWSTEEL.NS", 
+    "TATASTEEL.NS", "SIEMENS.NS", "IRFC.NS", "VBL.NS", "ZOMATO.NS", "PIDILITIND.NS", "GRASIM.NS", 
+    "SBILIFE.NS", "BEL.NS", "LTIM.NS", "TRENT.NS", "PNB.NS", "INDIGO.NS", "BANKBARODA.NS", 
+    "HDFCLIFE.NS", "ABB.NS", "BPCL.NS", "PFC.NS", "GODREJCP.NS", "TATAPOWER.NS", "HINDALCO.NS",
+    "VEDL.NS", "CHOLAFIN.NS", "AMBUJACEM.NS", "RECLTD.NS", "CIPLA.NS", "GAIL.NS", "SRF.NS", 
+    "TVSMOTOR.NS", "BOSCHLTD.NS", "EICHERMOT.NS", "DIVISLAB.NS", "CGPOWER.NS", "ZYDUSLIFE.NS",
+    "APOLLOHOSP.NS", "TECHM.NS", "MAXHEALTH.NS", "TORNTPOWER.NS", "COLPAL.NS", "KPITTECH.NS",
+    "AWL.NS", "CYIENT.NS"
+]
 
-def generate_reasoning(ticker, pe, sector_pe, roe, debt_eq, rsi, dma200, cmp):
-    """Generates human-like institutional reasoning for the dashboard."""
-    reasons = []
-    if pe < sector_pe * 0.7: reasons.append(f"Trades at {round((1-pe/sector_pe)*100)}% discount to sector.")
-    if roe > 20: reasons.append(f"Elite ROE of {roe}%.")
-    if debt_eq < 0.1: reasons.append("Virtually debt-free balance sheet.")
-    if cmp > dma200 and rsi < 60: reasons.append("Strong technical trend with RSI headroom.")
-    
-    if not reasons:
-        return "Standard quality metrics with stable valuation."
-    return " ".join(reasons[:2])
+def safe_get(info_dict, key, default=0):
+    """Safe Math: Prevents NaN (Not a Number) errors in the dashboard"""
+    val = info_dict.get(key)
+    if val is None or (isinstance(val, float) and math.isnan(val)): 
+        return default
+    return val
 
 def analyze_stock(ticker):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
-        cmp = info.get('currentPrice', 0)
-        if cmp == 0: return None
         
-        # Fundamental Data
-        pe = info.get('trailingPE', 25)
-        roe = (info.get('returnOnEquity', 0) or 0) * 100
-        debt_eq = info.get('debtToEquity', 0) / 100 if info.get('debtToEquity') else 0
-        fwd_eps = info.get('forwardEps', cmp/pe if pe != 0 else 1)
-        sector_pe = info.get('trailingPE', 25)
-        peg = info.get('pegRatio', 1.5)
-        eps_growth = round(pe / peg if peg and peg != 0 else 15, 1)
+        cmp = safe_get(info, 'currentPrice')
+        if cmp == 0: return None # Skip if no price data
+        
+        # Safe Fundamental Fetching
+        pe = safe_get(info, 'trailingPE', 25)
+        roe = safe_get(info, 'returnOnEquity', 0) * 100
+        debt_eq = safe_get(info, 'debtToEquity', 0) / 100
+        fwd_eps = safe_get(info, 'forwardEps', cmp/pe if pe else 1)
+        sector_pe = safe_get(info, 'trailingPE', 25)
+        peg = safe_get(info, 'pegRatio', 1.5)
+        eps_growth = pe / peg if (peg and peg > 0) else 15
         
         # Institutional Model
         fair_pe = min(sector_pe, roe * 2.0, eps_growth * 1.5, 45)
-        lt_target = round(fwd_eps * fair_pe)
-        upside_lt = ((lt_target - cmp) / cmp) * 100
-        upside_st = upside_lt * 0.35 # Standard ST projection
+        lt_target = fwd_eps * fair_pe
+        upside_lt = ((lt_target - cmp) / cmp) * 100 if cmp > 0 else 0
+        upside_st = upside_lt * 0.35
         
         # Technicals
-        rsi = info.get('rsi', 50) 
-        dma200 = info.get('twoHundredDayAverage', cmp * 0.95)
-        beta = info.get('beta', 1.0)
-
-        # Action Engine
+        rsi = safe_get(info, 'rsi', 50)
+        dma200 = safe_get(info, 'twoHundredDayAverage', cmp * 0.95)
+        beta = safe_get(info, 'beta', 1.0)
+        
+        # Risk & Action Logic
         action = "BUY"
         risk = "BALANCED"
-        if roe < 10 or debt_eq > 1.5 or cmp < dma200: 
+        if roe < 8 or debt_eq > 1.5 or cmp < dma200: 
             action = "AVOID"
             risk = "HIGH"
         elif rsi > 70: 
             action = "WAIT"
             risk = "BALANCED"
-        elif beta > 1.3:
-            risk = "AGGRESSIVE"
-        elif beta < 0.8:
-            risk = "CONSERVATIVE"
+        elif beta > 1.3: risk = "AGGRESSIVE"
+        elif beta < 0.8: risk = "CONSERVATIVE"
+
+        # Reasoning Generator
+        reasons = []
+        if pe > 0 and pe < sector_pe * 0.8: reasons.append(f"Trades at {round((1-pe/sector_pe)*100)}% discount to historical.")
+        if roe > 18: reasons.append(f"Elite capital efficiency (ROE {round(roe, 1)}%).")
+        if debt_eq < 0.15: reasons.append("Virtually debt-free balance sheet.")
+        if cmp > dma200 and rsi < 60: reasons.append("Strong technical trend with RSI headroom.")
+        reasoning = " ".join(reasons[:2]) if reasons else "Standard quality metrics with stable valuation."
 
         return {
             "id": ticker, "name": info.get('shortName', ticker), "ticker": ticker.replace('.NS', ''),
-            "sector": info.get('sector', 'General'), "cmp": cmp, "pe": round(pe, 1), "roe": round(roe, 1),
-            "debtEq": round(debt_eq, 2), "rsi": round(rsi), "dma200": round(dma200),
-            "upsideST": round(upside_st, 1), "upsideLT": round(upside_lt, 1), "risk": risk,
-            "stopLoss": round(cmp * 0.9), "action": action,
-            "reasoning": generate_reasoning(ticker, pe, sector_pe, roe, debt_eq, rsi, dma200, cmp)
+            "sector": info.get('sector', 'Equities'), "cmp": round(cmp, 2), "pe": round(pe, 1), 
+            "roe": round(roe, 1), "debtEq": round(debt_eq, 2), "rsi": round(rsi), 
+            "dma200": round(dma200, 2), "upsideST": round(upside_st, 1), "upsideLT": round(upside_lt, 1), 
+            "risk": risk, "stopLoss": round(cmp * 0.9, 2), "action": action, 
+            "ltTarget": round(lt_target, 2), "reasoning": reasoning
         }
-    except: return None
+    except Exception as e:
+        return None
 
 def fetch_and_analyze():
-    tickers = get_total_market_tickers()
+    print(f"Starting robust scan of {len(CORE_TICKERS)} Top Indian Equities...")
     all_results = []
-    for i, ticker in enumerate(tickers):
+    
+    for i, ticker in enumerate(CORE_TICKERS):
         res = analyze_stock(ticker)
         if res: all_results.append(res)
-        if i % 20 == 0: time.sleep(0.5) # Anti-block delay
+        time.sleep(0.5) # Crucial: Prevents Yahoo Finance from blocking us
+        
+    print(f"Successfully analyzed {len(all_results)} stocks.")
     
     # Sort by LT Upside and pick Top 50
     all_results.sort(key=lambda x: x['upsideLT'], reverse=True)
