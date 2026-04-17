@@ -1,193 +1,216 @@
-import yfinance as yf
-import pandas as pd
-import json
-import math
-import time
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, Activity, Briefcase, Zap } from 'lucide-react';
 
-# Massive Hardcoded Nifty Universe (Bypasses NSE Firewalls)
-MASSIVE_TICKER_LIST = [
-    "360ONE.NS", "3MINDIA.NS", "ABB.NS", "ACC.NS", "AARTIIND.NS", "AAVAS.NS", "ABBOTINDIA.NS", "ABCAPITAL.NS", 
-    "ABFRL.NS", "ADANIENSOL.NS", "ADANIENT.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "ADANIPOWER.NS", "ATGL.NS", 
-    "AWL.NS", "AEGISCHEM.NS", "AETHER.NS", "AFFLE.NS", "AJANTPHARM.NS", "APLLTD.NS", "ALKEM.NS", "ALKYLAMINE.NS", 
-    "ALLCARGO.NS", "AMBER.NS", "AMBUJACEM.NS", "ANGELONE.NS", "ANURAS.NS", "APARINDS.NS", "APLAPOLLO.NS", 
-    "APOLLOHOSP.NS", "APOLLOTYRE.NS", "APTUS.NS", "ASRAL.NS", "ASTRAL.NS", "ATUL.NS", "AUBANK.NS", "AUROPHARMA.NS", 
-    "AVANTIFEED.NS", "DMART.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJAJFINSV.NS", "BAJFINANCE.NS", "BALAMINES.NS", 
-    "BALKRISIND.NS", "BALRAMCHIN.NS", "BANDHANBNK.NS", "BANKBARODA.NS", "BANKINDIA.NS", "MAHABANK.NS", "BATAINDIA.NS", 
-    "BAYERCROP.NS", "BDL.NS", "BEL.NS", "BEML.NS", "BERGEPAINT.NS", "BHARATFORG.NS", "BHEL.NS", "BPCL.NS", 
-    "BHARTIARTL.NS", "BIOCON.NS", "BIRLACORPN.NS", "BSOFT.NS", "BLUEDART.NS", "BLUESTARCO.NS", "BOSCHLTD.NS", 
-    "BRIGADE.NS", "BRITANNIA.NS", "MAPMYINDIA.NS", "CCL.NS", "CAMPUS.NS", "CANFINHOME.NS", "CANBK.NS", "CAPLIPOINT.NS", 
-    "CGPOWER.NS", "CHALET.NS", "CHAMBLFERT.NS", "CHEMPLASTS.NS", "CHENNPETRO.NS", "CHOLAFIN.NS", "CHOLAHLDNG.NS", 
-    "CIPLA.NS", "CLEAN.NS", "COALINDIA.NS", "COCHINSHIP.NS", "COFORGE.NS", "COLPAL.NS", "CAMS.NS", "CONCOR.NS", 
-    "COROMANDEL.NS", "CRAFTSMAN.NS", "CREDITACC.NS", "CROMPTON.NS", "CUMMINSIND.NS", "CYIENT.NS", "DCMSHRIRAM.NS", 
-    "DELHIERY.NS", "DEVYANI.NS", "DIVISLAB.NS", "DIXON.NS", "LALPATHLAB.NS", "DRREDDY.NS", "EIDPARRY.NS", "EIHOTEL.NS", 
-    "EICHERMOT.NS", "ELECON.NS", "ELGIEQUIP.NS", "EMAMILTD.NS", "ENDURANCE.NS", "ENGINERSIN.NS", "EPL.NS", 
-    "EQUITASBNK.NS", "ESCORTS.NS", "EXIDEIND.NS", "NYKAA.NS", "FEDERALBNK.NS", "FACT.NS", "FINEORG.NS", "FINCABLES.NS", 
-    "FINPIPE.NS", "FSL.NS", "FORTIS.NS", "GAIL.NS", "GMMPFAUDLR.NS", "GMRINFRA.NS", "GALAXYSURF.NS", "GARFIBRES.NS", 
-    "GICRE.NS", "GILLETTE.NS", "GLAND.NS", "GLAXO.NS", "GLENMARK.NS", "MEDANTA.NS", "GODFRYPHLP.NS", "GODREJCP.NS", 
-    "GODREJIND.NS", "GODREJPROP.NS", "GRANULES.NS", "GRAPHITE.NS", "GRASIM.NS", "GRINDWELL.NS", "GUJGASLTD.NS", 
-    "GNFC.NS", "GSPL.NS", "HAVELLS.NS", "HCLTECH.NS", "HDFCAMC.NS", "HDFCBANK.NS", "HDFCLIFE.NS", "HEG.NS", 
-    "HEROMOTOCO.NS", "HFCL.NS", "HINDALCO.NS", "HAL.NS", "HINDCOPPER.NS", "HINDPETRO.NS", "HINDUNILVR.NS", "HINDZINC.NS", 
-    "HONAUT.NS", "HUDCO.NS", "ICICIBANK.NS", "ICICIGI.NS", "ICICIPRULI.NS", "ISEC.NS", "IDBI.NS", "IDFCFIRSTB.NS", 
-    "IDFC.NS", "IFBIND.NS", "IGL.NS", "IIFL.NS", "INDHOTEL.NS", "INDIACEM.NS", "INDIANB.NS", "IEX.NS", "INDIGO.NS", 
-    "INDIGOPNTS.NS", "INDUSINDBK.NS", "INDUSTOWER.NS", "INFIBEAM.NS", "NAUKRI.NS", "INFY.NS", "INOXLEISUR.NS", 
-    "INTELLECT.NS", "IPCALAB.NS", "IRB.NS", "IRCON.NS", "IRCTC.NS", "IRFC.NS", "ITC.NS", "ITDC.NS", "ITI.NS", 
-    "J&KBANK.NS", "JSL.NS", "JINDALSTEL.NS", "JIOFIN.NS", "JKCEMENT.NS", "JKPAPER.NS", "JKTYRE.NS", "JSWENERGY.NS", 
-    "JSWSTEEL.NS", "JUBLFOOD.NS", "JUBLINGREA.NS", "JUBLPHARMA.NS", "JUSTDIAL.NS", "JYOTHYLAB.NS", "KAJARIACER.NS", 
-    "KPITTECH.NS", "KALYANKJIL.NS", "KANSAINER.NS", "KARURVYSYA.NS", "KEC.NS", "KOTAKBANK.NS", "KPRMILL.NS", "KRBL.NS", 
-    "L&TFH.NS", "LTTS.NS", "LICHSGFIN.NS", "LICI.NS", "LTIM.NS", "LT.NS", "LAXMIMACH.NS", "LEMONTREE.NS", "LINDEINDIA.NS", 
-    "LUPIN.NS", "LUXIND.NS", "MRF.NS", "MTARTECH.NS", "LODHA.NS", "MGL.NS", "M&MFIN.NS", "M&M.NS", "MAHSCOOTER.NS", 
-    "MAHASAMLES.NS", "MANAPPURAM.NS", "MARICO.NS", "MARUTI.NS", "MASTEK.NS", "MFSL.NS", "MAXHEALTH.NS", "MAZDOCK.NS", 
-    "MEDPLUS.NS", "METROBRAND.NS", "METROPOLIS.NS", "MOTILALOFS.NS", "MPHASIS.NS", "MRPL.NS", "MUTHOOTFIN.NS", 
-    "NATCOPHARM.NS", "NATIONALUM.NS", "NAVINFLUOR.NS", "NCC.NS", "NESTLEIND.NS", "NETWORK18.NS", "NAM-INDIA.NS", 
-    "NLCINDIA.NS", "NMDC.NS", "NOCIL.NS", "NTPC.NS", "NUVOCO.NS", "OBEROIRLTY.NS", "ONGC.NS", "OIL.NS", "PAYTM.NS", 
-    "OFSS.NS", "ORIENTELEC.NS", "PAGEIND.NS", "PATANJALI.NS", "PERSISTENT.NS", "PETRONET.NS", "PFIZER.NS", "PHOENIXLTD.NS", 
-    "PIDILITIND.NS", "PEL.NS", "PIIND.NS", "PNBHOUSING.NS", "PNCINFRA.NS", "POLYCAB.NS", "POONAWALLA.NS", "PFC.NS", 
-    "POWERGRID.NS", "PRESTIGE.NS", "PRINCEPIPE.NS", "PNB.NS", "QUESS.NS", "RBLBANK.NS", "RECLTD.NS", "REDINGTON.NS", 
-    "RELAXO.NS", "RELIANCE.NS", "RBA.NS", "ROUTE.NS", "RVNL.NS", "SAFARI.NS", "SANSERA.NS", "SANOFI.NS", "SAPPHIRE.NS", 
-    "SAREGAMA.NS", "SCHAEFFLER.NS", "SCHNEIDER.NS", "SHREECEM.NS", "SHRIRAMFIN.NS", "SHYAMMETL.NS", "SIEMENS.NS", 
-    "SIS.NS", "SJVN.NS", "SKFINDIA.NS", "SOBA.NS", "SOLARINDS.NS", "SONACOMS.NS", "SOUTHBANK.NS", "SPARC.NS", 
-    "STARHEALTH.NS", "SBILIFE.NS", "SBIN.NS", "SAIL.NS", "SUMICHEM.NS", "SUNPHARMA.NS", "SUNTV.NS", "SUNDARMFIN.NS", 
-    "SUNDRMFAST.NS", "SUNTECK.NS", "SUPRAJIT.NS", "SUPREMEIND.NS", "SUVENPHAR.NS", "SUZLON.NS", "SWANENERGY.NS", 
-    "SYMPHONY.NS", "SYNGENE.NS", "TCIEXP.NS", "TCNSBRANDS.NS", "TCS.NS", "TATACHEM.NS", "TATACOMM.NS", "TATACONSUM.NS", 
-    "TATAELXSI.NS", "TATAINVEST.NS", "TATAMOTORS.NS", "TATAPOWER.NS", "TATASTEEL.NS", "TTML.NS", "TEAMLEASE.NS", 
-    "TECHM.NS", "TEJASNET.NS", "NIACL.NS", "RAMCOCEM.NS", "THERMAX.NS", "TIMKEN.NS", "TITAN.NS", "TORNTPHARM.NS", 
-    "TORNTPOWER.NS", "TRENT.NS", "TRIDENT.NS", "TRIVENI.NS", "TRITURBINE.NS", "TIINDIA.NS", "UCOBANK.NS", "ULTRACEMCO.NS", 
-    "UNIONBANK.NS", "UBL.NS", "MCDOWELL-N.NS", "UPLLTD.NS", "UTIAMC.NS", "VGUARD.NS", "VIPIND.NS", "VTL.NS", "VARROC.NS", 
-    "VBL.NS", "VEDL.NS", "VIJAYA.NS", "VINATIORGA.NS", "VOLTAS.NS", "WELCORP.NS", "WELENT.NS", "WHIRLPOOL.NS", "WIPRO.NS", 
-    "YESBANK.NS", "ZEEL.NS", "ZENSARTECH.NS", "ZOMATO.NS", "ZYDUSLIFE.NS", "ZYDUSWELL.NS"
-]
+export default function App() {
+  const [activeTab, setActiveTab] = useState('longTerm'); // 'longTerm' or 'shortTerm'
+  const [ltData, setLtData] = useState([]);
+  const [stData, setStData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
-def clean_val(val, default="N/A"):
-    """Strictly cleans Yahoo Finance data to prevent NaN UI breaks."""
-    try:
-        if val is None: return default
-        f_val = float(val)
-        if math.isnan(f_val) or math.isinf(f_val): return default
-        return f_val
-    except:
-        return default
+  // Fetch both data feeds
+  useEffect(() => {
+    const fetchAllData = async () => {
+      try {
+        const [ltRes, stRes] = await Promise.all([
+          fetch('https://raw.githubusercontent.com/Arshme35/AZ-Marketdata/main/daily_picks.json'),
+          fetch('https://raw.githubusercontent.com/Arshme35/AZ-Marketdata/main/swing_picks.json')
+        ]);
+        
+        if (ltRes.ok) setLtData(await ltRes.json());
+        if (stRes.ok) setStData(await stRes.json());
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Data Fetch Error:", error);
+        setIsLoading(false);
+      }
+    };
+    fetchAllData();
+  }, []);
 
-def analyze_stock(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        cmp = clean_val(info.get('currentPrice'))
-        if cmp == "N/A" or cmp <= 0: return None 
-        
-        pe = clean_val(info.get('trailingPE'))
-        roe_raw = clean_val(info.get('returnOnEquity'))
-        roe = roe_raw * 100 if roe_raw != "N/A" else "N/A"
-        debt_eq_raw = clean_val(info.get('debtToEquity'))
-        debt_eq = debt_eq_raw / 100 if debt_eq_raw != "N/A" else "N/A"
-        fwd_eps = clean_val(info.get('forwardEps'))
-        sector_pe = clean_val(info.get('trailingPE'), 25)
-        peg = clean_val(info.get('pegRatio'))
-        
-        # New 52 Week High/Low
-        low52 = clean_val(info.get('fiftyTwoWeekLow'))
-        high52 = clean_val(info.get('fiftyTwoWeekHigh'))
+  // Filter based on active tab
+  const currentData = activeTab === 'longTerm' ? ltData : stData;
+  const filteredData = useMemo(() => {
+    if (!search) return currentData;
+    return currentData.filter(s => 
+      s.name.toLowerCase().includes(search.toLowerCase()) || 
+      s.ticker.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [currentData, search]);
 
-        # Fetch News
-        try:
-            news_list = stock.news
-            latest_news = news_list[0]['title'] if news_list else "No recent catalysts or news."
-        except:
-            latest_news = "News feed unavailable."
+  if (isLoading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 font-sans">
+        <Activity className="animate-spin text-blue-600 mb-4" size={48} />
+        <h2 className="text-xl font-bold text-slate-700 uppercase tracking-widest">Loading Multi-Strategy Engine...</h2>
+      </div>
+    );
+  }
+
+  const formatNumber = (num) => {
+    if (num === null || num === undefined || isNaN(num) || num === "N/A") return "N/A";
+    return Number(num).toLocaleString('en-IN', { maximumFractionDigits: 1 });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] p-4 md:p-10 font-sans text-slate-900">
+      <div className="max-w-[1700px] mx-auto">
         
-        if pe != "N/A" and peg != "N/A" and peg > 0: eps_growth = pe / peg
-        else: eps_growth = 15
+        {/* Header & Tabs */}
+        <header className="mb-12 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
+          <div>
+            <div className="flex items-center gap-4 mb-3">
+              <h1 className="text-5xl font-black text-slate-900 tracking-tighter">Quant Desk <span className="text-blue-600">Pro</span></h1>
+            </div>
             
-        if pe != "N/A" and roe != "N/A" and fwd_eps != "N/A":
-            fair_pe = min(sector_pe, roe * 2.0, eps_growth * 1.5, 45)
-            lt_target = round(fwd_eps * fair_pe, 2)
-            upside_lt = round(((lt_target - cmp) / cmp) * 100, 1) if cmp > 0 else "N/A"
-            upside_st = round(upside_lt * 0.35, 1) if upside_lt != "N/A" else "N/A"
-        else:
-            lt_target = "N/A"
-            upside_lt = "N/A"
-            upside_st = "N/A"
-        
-        rsi = clean_val(info.get('rsi'))
-        dma200 = clean_val(info.get('twoHundredDayAverage'))
-        beta = clean_val(info.get('beta'))
-        
-        action = "BUY"
-        risk = "BALANCED"
-        
-        if upside_lt != "N/A" and upside_lt > 300: return None 
-        
-        avoid_reasons = []
-        if roe != "N/A" and roe < 8: 
-            action = "AVOID"
-            avoid_reasons.append("Low Capital Efficiency (ROE < 8%)")
-        if debt_eq != "N/A" and debt_eq > 1.5: 
-            action = "AVOID"
-            avoid_reasons.append("High Debt Risk (D/E > 1.5)")
-        if dma200 != "N/A" and cmp < dma200: 
-            action = "AVOID"
-            avoid_reasons.append("Downtrend (Below 200 DMA)")
-        if rsi != "N/A" and rsi > 70: 
-            action = "WAIT"
-            avoid_reasons.append("Overbought Technicals (RSI > 70)")
-        if pe != "N/A" and sector_pe != "N/A" and pe > sector_pe * 1.5:
-            action = "WAIT"
-            avoid_reasons.append("Overvalued vs Sector peers")
-            
-        avoid_reason_str = " • ".join(avoid_reasons) if avoid_reasons else "None"
-        
-        if beta != "N/A":
-            if beta > 1.3: risk = "AGGRESSIVE"
-            elif beta < 0.8: risk = "CONSERVATIVE"
+            {/* Strategy Toggle */}
+            <div className="flex bg-slate-200 p-1.5 rounded-xl w-fit mt-6">
+              <button 
+                onClick={() => setActiveTab('longTerm')}
+                className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'longTerm' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <Briefcase size={16} /> Long-Term Value
+              </button>
+              <button 
+                onClick={() => setActiveTab('shortTerm')}
+                className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'shortTerm' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                <Zap size={16} /> Short-Term / Swing
+              </button>
+            </div>
+          </div>
+          
+          <div className="relative w-full lg:w-96 shadow-lg rounded-2xl overflow-hidden border border-slate-200">
+            <Search className="absolute left-4 top-4 text-slate-400" size={20} />
+            <input 
+              type="text" 
+              className="w-full pl-12 pr-6 py-4 bg-white border-none focus:ring-4 focus:ring-blue-500/20 text-md font-bold transition-all outline-none"
+              placeholder="Search assets..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </header>
 
-        reasons = []
-        if pe != "N/A" and sector_pe != "N/A" and pe < sector_pe * 0.8: 
-            reasons.append(f"Trades at {round((1-pe/sector_pe)*100)}% discount to sector.")
-        if roe != "N/A" and roe > 18: 
-            reasons.append(f"Elite capital efficiency (ROE {round(roe, 1)}%).")
-        if debt_eq != "N/A" and debt_eq < 0.15: 
-            reasons.append("Virtually debt-free balance sheet.")
-        if dma200 != "N/A" and rsi != "N/A" and cmp > dma200 and rsi < 60: 
-            reasons.append("Strong technical trend with RSI headroom.")
-        reasoning = " ".join(reasons[:2]) if reasons else "Solid fundamentals but lacks extreme asymmetry."
+        {/* Master Data Grid */}
+        <div className="bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[1600px]">
+              
+              {/* Dynamic Headers based on active strategy */}
+              <thead>
+                <tr className="text-[11px] uppercase font-black text-slate-400 tracking-[0.15em] border-b border-slate-100 bg-slate-50/50">
+                  <th className="px-10 py-6">Asset & Rank</th>
+                  <th className="px-4 py-6 text-right">CMP (₹)</th>
+                  
+                  {activeTab === 'longTerm' ? (
+                    <>
+                      <th className="px-4 py-6 text-right">P/E</th>
+                      <th className="px-4 py-6 text-right">ROE %</th>
+                      <th className="px-4 py-6 text-right">D/E</th>
+                      <th className="px-4 py-6 text-right text-emerald-700 font-black">LT Upside</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-4 py-6 text-right text-blue-600 font-black">Vol Surge</th>
+                      <th className="px-4 py-6 text-right">50 DMA</th>
+                      <th className="px-4 py-6 text-right">% from 50DMA</th>
+                      <th className="px-4 py-6 text-right text-purple-600 font-black">Momentum Score</th>
+                    </>
+                  )}
 
-        return {
-            "id": ticker, "name": info.get('shortName', ticker), "ticker": ticker.replace('.NS', ''),
-            "sector": info.get('sector', 'Equities'), "cmp": round(cmp, 2), 
-            "pe": round(pe, 1) if pe != "N/A" else pe, 
-            "roe": round(roe, 1) if roe != "N/A" else roe, 
-            "debtEq": round(debt_eq, 2) if debt_eq != "N/A" else debt_eq, 
-            "rsi": round(rsi) if rsi != "N/A" else rsi, 
-            "dma200": round(dma200, 2) if dma200 != "N/A" else dma200, 
-            "low52": round(low52, 2) if low52 != "N/A" else low52,
-            "high52": round(high52, 2) if high52 != "N/A" else high52,
-            "upsideST": upside_st, "upsideLT": upside_lt, 
-            "risk": risk, "stopLoss": round(cmp * 0.9, 2), "action": action, 
-            "ltTarget": lt_target, "reasoning": reasoning,
-            "avoidReason": avoid_reason_str, "news": latest_news
-        }
-    except Exception as e:
-        return None
+                  <th className="px-4 py-6 text-right">RSI</th>
+                  <th className="px-4 py-6 text-right text-slate-500">52W L/H</th>
+                  <th className="px-4 py-6 text-center">Action</th>
+                  <th className="px-10 py-6 w-[350px]">System Catalyst / Reasoning</th>
+                  <th className="px-8 py-6 w-[350px]">Latest News</th>
+                </tr>
+              </thead>
 
-def fetch_and_analyze():
-    print(f"Starting robust scan of {len(MASSIVE_TICKER_LIST)} Top Indian Equities...")
-    all_results = []
-    
-    for i, ticker in enumerate(MASSIVE_TICKER_LIST):
-        res = analyze_stock(ticker)
-        if res: all_results.append(res)
-        time.sleep(0.5) 
-        
-    print(f"Successfully analyzed {len(all_results)} stocks.")
-    
-    def sort_key(x):
-        return x['upsideLT'] if isinstance(x['upsideLT'], (int, float)) else -9999
-        
-    all_results.sort(key=sort_key, reverse=True)
-    final_50 = all_results[:50]
-    
-    with open('daily_picks.json', 'w') as f:
-        json.dump(final_50, f, indent=2)
+              <tbody className="divide-y divide-slate-50 text-sm">
+                {filteredData.map((stock, idx) => (
+                  <tr key={stock.id} className="hover:bg-blue-50/40 transition-colors group">
+                    <td className="px-10 py-6">
+                      <div className="flex items-center gap-5">
+                        <span className="text-[10px] font-black text-slate-300">{(idx + 1).toString().padStart(2, '0')}</span>
+                        <div>
+                          <div className="font-black text-slate-900 text-base">{stock.name}</div>
+                          <div className="text-[11px] text-blue-500 font-bold uppercase tracking-tight mt-1">
+                            {stock.ticker} <span className="text-slate-300 mx-1">•</span> {stock.sector}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    
+                    <td className="px-4 py-6 text-right font-bold text-slate-800">
+                      {stock.cmp === "N/A" ? "N/A" : `₹${formatNumber(stock.cmp)}`}
+                    </td>
 
-if __name__ == "__main__":
-    fetch_and_analyze()
+                    {/* Dynamic Table Data based on Strategy */}
+                    {activeTab === 'longTerm' ? (
+                      <>
+                        <td className="px-4 py-6 text-right font-bold text-slate-600">{stock.pe === "N/A" ? "N/A" : `${stock.pe}x`}</td>
+                        <td className="px-4 py-6 text-right font-black text-blue-600">{stock.roe === "N/A" ? "N/A" : `${stock.roe}%`}</td>
+                        <td className="px-4 py-6 text-right text-slate-500 font-bold">{stock.debtEq}</td>
+                        <td className="px-4 py-6 text-right font-black text-emerald-700 text-lg">
+                          {stock.upsideLT === "N/A" ? "N/A" : `+${stock.upsideLT}%`}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-6 text-right font-black text-blue-600 text-lg">
+                          {stock.volSurge === "N/A" ? "N/A" : `${stock.volSurge}x`}
+                        </td>
+                        <td className="px-4 py-6 text-right font-bold text-slate-500">
+                           {stock.dma50 === "N/A" ? "N/A" : `₹${formatNumber(stock.dma50)}`}
+                        </td>
+                        <td className="px-4 py-6 text-right font-bold text-emerald-600">
+                           {stock.dist50dma === "N/A" ? "N/A" : `${stock.dist50dma > 0 ? '+' : ''}${stock.dist50dma}%`}
+                        </td>
+                        <td className="px-4 py-6 text-right font-black text-purple-600 text-lg">
+                          {stock.stScore}
+                        </td>
+                      </>
+                    )}
+
+                    <td className="px-4 py-6 text-right">
+                      <span className={`px-2 py-1 rounded font-black text-xs ${stock.rsi === "N/A" ? 'bg-slate-100 text-slate-400' : stock.rsi > 70 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                        {stock.rsi}
+                      </span>
+                    </td>
+                    
+                    <td className="px-4 py-6 text-right font-bold text-xs">
+                      <div className="text-rose-500">L: {stock.low52 === "N/A" ? "N/A" : `₹${formatNumber(stock.low52)}`}</div>
+                      <div className="text-emerald-500">H: {stock.high52 === "N/A" ? "N/A" : `₹${formatNumber(stock.high52)}`}</div>
+                    </td>
+
+                    <td className="px-4 py-6 text-center">
+                      <span className={`px-5 py-2.5 rounded-xl text-[10px] font-black text-white shadow-sm tracking-widest ${
+                        (activeTab === 'longTerm' ? stock.ltAction : stock.stAction) === 'BUY' || (activeTab === 'longTerm' ? stock.ltAction : stock.stAction) === 'MOMENTUM' ? 'bg-emerald-500' : 
+                        'bg-blue-500' 
+                      }`}>
+                        {activeTab === 'longTerm' ? stock.ltAction : stock.stAction}
+                      </span>
+                    </td>
+
+                    <td className="px-10 py-6">
+                      <div className="text-[11px] leading-relaxed text-slate-600 bg-slate-50 p-4 rounded-2xl border border-slate-100 font-semibold italic">
+                        {activeTab === 'longTerm' ? stock.reasoning : stock.stReasoning}
+                      </div>
+                    </td>
+
+                    <td className="px-8 py-6">
+                      <div className="text-[11px] leading-relaxed text-slate-700 font-medium line-clamp-3">
+                        {stock.news}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
