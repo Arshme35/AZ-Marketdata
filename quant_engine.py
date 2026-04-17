@@ -223,7 +223,3 @@ def fetch_and_analyze():
 
 if __name__ == "__main__":
     fetch_and_analyze()
-
-### Action Steps:
-1. Commit the Python update to GitHub and manually run your Action.
-2. The UI will now display exactly the 20 highest-probability setups for both your long-term investing portfolio and your short-term swing trading strategies!
