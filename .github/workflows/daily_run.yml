@@ -2,9 +2,12 @@ name: Daily Quant Engine Run
 
 on:
   schedule:
-    # Runs automatically every day around market close
     - cron: '30 11 * * *' 
-  workflow_dispatch: # This allows you to run it manually
+  workflow_dispatch:
+
+# THIS IS THE MAGIC FIX: Grants the bot permission to save the files
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -22,7 +25,7 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install yfinance pandas
+        pip install yfinance pandas requests
 
     - name: Run Quant Engine
       run: python quant_engine.py
@@ -31,7 +34,6 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "Quant Desk Bot"
-        git add daily_picks.json swing_picks.json
-        # The || echo prevents the workflow from failing if data hasn't changed
-        git commit -m "Automated Data Update: Value & Swing" || echo "No changes to commit"
+        git add *.json
+        git commit -m "Automated Data Update" || echo "No changes to commit"
         git push
