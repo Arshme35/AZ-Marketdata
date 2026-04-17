@@ -1,104 +1,189 @@
 import yfinance as yf
+import pandas as pd
 import json
-import time
 import math
+import time
 
-# Built-in High-Liquidity Indian Market List (Bypasses NSE blocks entirely)
-CORE_TICKERS = [
-    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "BHARTIARTL.NS", "SBIN.NS", "INFY.NS", 
-    "LICI.NS", "ITC.NS", "HINDUNILVR.NS", "LT.NS", "BAJFINANCE.NS", "HCLTECH.NS", "MARUTI.NS", 
-    "SUNPHARMA.NS", "ADANIENT.NS", "KOTAKBANK.NS", "TITAN.NS", "ONGC.NS", "TATAMOTORS.NS", 
-    "NTPC.NS", "AXISBANK.NS", "DMART.NS", "ADANIPORTS.NS", "ULTRACEMCO.NS", "ASIANPAINT.NS", 
-    "COALINDIA.NS", "BAJAJFINSV.NS", "BAJAJ-AUTO.NS", "POWERGRID.NS", "NESTLEIND.NS", "WIPRO.NS", 
-    "M&M.NS", "IOC.NS", "JIOFIN.NS", "HAL.NS", "DLF.NS", "ADANIPOWER.NS", "JSWSTEEL.NS", 
-    "TATASTEEL.NS", "SIEMENS.NS", "IRFC.NS", "VBL.NS", "ZOMATO.NS", "PIDILITIND.NS", "GRASIM.NS", 
-    "SBILIFE.NS", "BEL.NS", "LTIM.NS", "TRENT.NS", "PNB.NS", "INDIGO.NS", "BANKBARODA.NS", 
-    "HDFCLIFE.NS", "ABB.NS", "BPCL.NS", "PFC.NS", "GODREJCP.NS", "TATAPOWER.NS", "HINDALCO.NS",
-    "VEDL.NS", "CHOLAFIN.NS", "AMBUJACEM.NS", "RECLTD.NS", "CIPLA.NS", "GAIL.NS", "SRF.NS", 
-    "TVSMOTOR.NS", "BOSCHLTD.NS", "EICHERMOT.NS", "DIVISLAB.NS", "CGPOWER.NS", "ZYDUSLIFE.NS",
-    "APOLLOHOSP.NS", "TECHM.NS", "MAXHEALTH.NS", "TORNTPOWER.NS", "COLPAL.NS", "KPITTECH.NS",
-    "AWL.NS", "CYIENT.NS"
+# Massive Hardcoded Nifty Universe (Bypasses NSE Firewalls)
+MASSIVE_TICKER_LIST = [
+    "360ONE.NS", "3MINDIA.NS", "ABB.NS", "ACC.NS", "AARTIIND.NS", "AAVAS.NS", "ABBOTINDIA.NS", "ABCAPITAL.NS", 
+    "ABFRL.NS", "ADANIENSOL.NS", "ADANIENT.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "ADANIPOWER.NS", "ATGL.NS", 
+    "AWL.NS", "AEGISCHEM.NS", "AETHER.NS", "AFFLE.NS", "AJANTPHARM.NS", "APLLTD.NS", "ALKEM.NS", "ALKYLAMINE.NS", 
+    "ALLCARGO.NS", "AMBER.NS", "AMBUJACEM.NS", "ANGELONE.NS", "ANURAS.NS", "APARINDS.NS", "APLAPOLLO.NS", 
+    "APOLLOHOSP.NS", "APOLLOTYRE.NS", "APTUS.NS", "ASRAL.NS", "ASTRAL.NS", "ATUL.NS", "AUBANK.NS", "AUROPHARMA.NS", 
+    "AVANTIFEED.NS", "DMART.NS", "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJAJFINSV.NS", "BAJFINANCE.NS", "BALAMINES.NS", 
+    "BALKRISIND.NS", "BALRAMCHIN.NS", "BANDHANBNK.NS", "BANKBARODA.NS", "BANKINDIA.NS", "MAHABANK.NS", "BATAINDIA.NS", 
+    "BAYERCROP.NS", "BDL.NS", "BEL.NS", "BEML.NS", "BERGEPAINT.NS", "BHARATFORG.NS", "BHEL.NS", "BPCL.NS", 
+    "BHARTIARTL.NS", "BIOCON.NS", "BIRLACORPN.NS", "BSOFT.NS", "BLUEDART.NS", "BLUESTARCO.NS", "BOSCHLTD.NS", 
+    "BRIGADE.NS", "BRITANNIA.NS", "MAPMYINDIA.NS", "CCL.NS", "CAMPUS.NS", "CANFINHOME.NS", "CANBK.NS", "CAPLIPOINT.NS", 
+    "CGPOWER.NS", "CHALET.NS", "CHAMBLFERT.NS", "CHEMPLASTS.NS", "CHENNPETRO.NS", "CHOLAFIN.NS", "CHOLAHLDNG.NS", 
+    "CIPLA.NS", "CLEAN.NS", "COALINDIA.NS", "COCHINSHIP.NS", "COFORGE.NS", "COLPAL.NS", "CAMS.NS", "CONCOR.NS", 
+    "COROMANDEL.NS", "CRAFTSMAN.NS", "CREDITACC.NS", "CROMPTON.NS", "CUMMINSIND.NS", "CYIENT.NS", "DCMSHRIRAM.NS", 
+    "DELHIERY.NS", "DEVYANI.NS", "DIVISLAB.NS", "DIXON.NS", "LALPATHLAB.NS", "DRREDDY.NS", "EIDPARRY.NS", "EIHOTEL.NS", 
+    "EICHERMOT.NS", "ELECON.NS", "ELGIEQUIP.NS", "EMAMILTD.NS", "ENDURANCE.NS", "ENGINERSIN.NS", "EPL.NS", 
+    "EQUITASBNK.NS", "ESCORTS.NS", "EXIDEIND.NS", "NYKAA.NS", "FEDERALBNK.NS", "FACT.NS", "FINEORG.NS", "FINCABLES.NS", 
+    "FINPIPE.NS", "FSL.NS", "FORTIS.NS", "GAIL.NS", "GMMPFAUDLR.NS", "GMRINFRA.NS", "GALAXYSURF.NS", "GARFIBRES.NS", 
+    "GICRE.NS", "GILLETTE.NS", "GLAND.NS", "GLAXO.NS", "GLENMARK.NS", "MEDANTA.NS", "GODFRYPHLP.NS", "GODREJCP.NS", 
+    "GODREJIND.NS", "GODREJPROP.NS", "GRANULES.NS", "GRAPHITE.NS", "GRASIM.NS", "GRINDWELL.NS", "GUJGASLTD.NS", 
+    "GNFC.NS", "GSPL.NS", "HAVELLS.NS", "HCLTECH.NS", "HDFCAMC.NS", "HDFCBANK.NS", "HDFCLIFE.NS", "HEG.NS", 
+    "HEROMOTOCO.NS", "HFCL.NS", "HINDALCO.NS", "HAL.NS", "HINDCOPPER.NS", "HINDPETRO.NS", "HINDUNILVR.NS", "HINDZINC.NS", 
+    "HONAUT.NS", "HUDCO.NS", "ICICIBANK.NS", "ICICIGI.NS", "ICICIPRULI.NS", "ISEC.NS", "IDBI.NS", "IDFCFIRSTB.NS", 
+    "IDFC.NS", "IFBIND.NS", "IGL.NS", "IIFL.NS", "INDHOTEL.NS", "INDIACEM.NS", "INDIANB.NS", "IEX.NS", "INDIGO.NS", 
+    "INDIGOPNTS.NS", "INDUSINDBK.NS", "INDUSTOWER.NS", "INFIBEAM.NS", "NAUKRI.NS", "INFY.NS", "INOXLEISUR.NS", 
+    "INTELLECT.NS", "IPCALAB.NS", "IRB.NS", "IRCON.NS", "IRCTC.NS", "IRFC.NS", "ITC.NS", "ITDC.NS", "ITI.NS", 
+    "J&KBANK.NS", "JSL.NS", "JINDALSTEL.NS", "JIOFIN.NS", "JKCEMENT.NS", "JKPAPER.NS", "JKTYRE.NS", "JSWENERGY.NS", 
+    "JSWSTEEL.NS", "JUBLFOOD.NS", "JUBLINGREA.NS", "JUBLPHARMA.NS", "JUSTDIAL.NS", "JYOTHYLAB.NS", "KAJARIACER.NS", 
+    "KPITTECH.NS", "KALYANKJIL.NS", "KANSAINER.NS", "KARURVYSYA.NS", "KEC.NS", "KOTAKBANK.NS", "KPRMILL.NS", "KRBL.NS", 
+    "L&TFH.NS", "LTTS.NS", "LICHSGFIN.NS", "LICI.NS", "LTIM.NS", "LT.NS", "LAXMIMACH.NS", "LEMONTREE.NS", "LINDEINDIA.NS", 
+    "LUPIN.NS", "LUXIND.NS", "MRF.NS", "MTARTECH.NS", "LODHA.NS", "MGL.NS", "M&MFIN.NS", "M&M.NS", "MAHSCOOTER.NS", 
+    "MAHASAMLES.NS", "MANAPPURAM.NS", "MARICO.NS", "MARUTI.NS", "MASTEK.NS", "MFSL.NS", "MAXHEALTH.NS", "MAZDOCK.NS", 
+    "MEDPLUS.NS", "METROBRAND.NS", "METROPOLIS.NS", "MOTILALOFS.NS", "MPHASIS.NS", "MRPL.NS", "MUTHOOTFIN.NS", 
+    "NATCOPHARM.NS", "NATIONALUM.NS", "NAVINFLUOR.NS", "NCC.NS", "NESTLEIND.NS", "NETWORK18.NS", "NAM-INDIA.NS", 
+    "NLCINDIA.NS", "NMDC.NS", "NOCIL.NS", "NTPC.NS", "NUVOCO.NS", "OBEROIRLTY.NS", "ONGC.NS", "OIL.NS", "PAYTM.NS", 
+    "OFSS.NS", "ORIENTELEC.NS", "PAGEIND.NS", "PATANJALI.NS", "PERSISTENT.NS", "PETRONET.NS", "PFIZER.NS", "PHOENIXLTD.NS", 
+    "PIDILITIND.NS", "PEL.NS", "PIIND.NS", "PNBHOUSING.NS", "PNCINFRA.NS", "POLYCAB.NS", "POONAWALLA.NS", "PFC.NS", 
+    "POWERGRID.NS", "PRESTIGE.NS", "PRINCEPIPE.NS", "PNB.NS", "QUESS.NS", "RBLBANK.NS", "RECLTD.NS", "REDINGTON.NS", 
+    "RELAXO.NS", "RELIANCE.NS", "RBA.NS", "ROUTE.NS", "RVNL.NS", "SAFARI.NS", "SANSERA.NS", "SANOFI.NS", "SAPPHIRE.NS", 
+    "SAREGAMA.NS", "SCHAEFFLER.NS", "SCHNEIDER.NS", "SHREECEM.NS", "SHRIRAMFIN.NS", "SHYAMMETL.NS", "SIEMENS.NS", 
+    "SIS.NS", "SJVN.NS", "SKFINDIA.NS", "SOBA.NS", "SOLARINDS.NS", "SONACOMS.NS", "SOUTHBANK.NS", "SPARC.NS", 
+    "STARHEALTH.NS", "SBILIFE.NS", "SBIN.NS", "SAIL.NS", "SUMICHEM.NS", "SUNPHARMA.NS", "SUNTV.NS", "SUNDARMFIN.NS", 
+    "SUNDRMFAST.NS", "SUNTECK.NS", "SUPRAJIT.NS", "SUPREMEIND.NS", "SUVENPHAR.NS", "SUZLON.NS", "SWANENERGY.NS", 
+    "SYMPHONY.NS", "SYNGENE.NS", "TCIEXP.NS", "TCNSBRANDS.NS", "TCS.NS", "TATACHEM.NS", "TATACOMM.NS", "TATACONSUM.NS", 
+    "TATAELXSI.NS", "TATAINVEST.NS", "TATAMOTORS.NS", "TATAPOWER.NS", "TATASTEEL.NS", "TTML.NS", "TEAMLEASE.NS", 
+    "TECHM.NS", "TEJASNET.NS", "NIACL.NS", "RAMCOCEM.NS", "THERMAX.NS", "TIMKEN.NS", "TITAN.NS", "TORNTPHARM.NS", 
+    "TORNTPOWER.NS", "TRENT.NS", "TRIDENT.NS", "TRIVENI.NS", "TRITURBINE.NS", "TIINDIA.NS", "UCOBANK.NS", "ULTRACEMCO.NS", 
+    "UNIONBANK.NS", "UBL.NS", "MCDOWELL-N.NS", "UPLLTD.NS", "UTIAMC.NS", "VGUARD.NS", "VIPIND.NS", "VTL.NS", "VARROC.NS", 
+    "VBL.NS", "VEDL.NS", "VIJAYA.NS", "VINATIORGA.NS", "VOLTAS.NS", "WELCORP.NS", "WELENT.NS", "WHIRLPOOL.NS", "WIPRO.NS", 
+    "YESBANK.NS", "ZEEL.NS", "ZENSARTECH.NS", "ZOMATO.NS", "ZYDUSLIFE.NS", "ZYDUSWELL.NS"
 ]
 
-def safe_get(info_dict, key, default=0):
-    """Safe Math: Prevents NaN (Not a Number) errors in the dashboard"""
-    val = info_dict.get(key)
-    if val is None or (isinstance(val, float) and math.isnan(val)): 
+def clean_val(val, default="N/A"):
+    """Strictly cleans Yahoo Finance data to prevent NaN UI breaks."""
+    try:
+        if val is None: return default
+        f_val = float(val)
+        if math.isnan(f_val) or math.isinf(f_val): return default
+        return f_val
+    except:
         return default
-    return val
 
 def analyze_stock(ticker):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
         
-        cmp = safe_get(info, 'currentPrice')
-        if cmp == 0: return None # Skip if no price data
+        cmp = clean_val(info.get('currentPrice'))
+        if cmp == "N/A" or cmp <= 0: return None 
         
-        # Safe Fundamental Fetching
-        pe = safe_get(info, 'trailingPE', 25)
-        roe = safe_get(info, 'returnOnEquity', 0) * 100
-        debt_eq = safe_get(info, 'debtToEquity', 0) / 100
-        fwd_eps = safe_get(info, 'forwardEps', cmp/pe if pe else 1)
-        sector_pe = safe_get(info, 'trailingPE', 25)
-        peg = safe_get(info, 'pegRatio', 1.5)
-        eps_growth = pe / peg if (peg and peg > 0) else 15
+        pe = clean_val(info.get('trailingPE'))
+        roe_raw = clean_val(info.get('returnOnEquity'))
+        roe = roe_raw * 100 if roe_raw != "N/A" else "N/A"
+        debt_eq_raw = clean_val(info.get('debtToEquity'))
+        debt_eq = debt_eq_raw / 100 if debt_eq_raw != "N/A" else "N/A"
+        fwd_eps = clean_val(info.get('forwardEps'))
+        sector_pe = clean_val(info.get('trailingPE'), 25)
+        peg = clean_val(info.get('pegRatio'))
         
-        # Institutional Model
-        fair_pe = min(sector_pe, roe * 2.0, eps_growth * 1.5, 45)
-        lt_target = fwd_eps * fair_pe
-        upside_lt = ((lt_target - cmp) / cmp) * 100 if cmp > 0 else 0
-        upside_st = upside_lt * 0.35
+        # New 52 Week High/Low
+        low52 = clean_val(info.get('fiftyTwoWeekLow'))
+        high52 = clean_val(info.get('fiftyTwoWeekHigh'))
+
+        # Fetch News
+        try:
+            news_list = stock.news
+            latest_news = news_list[0]['title'] if news_list else "No recent catalysts or news."
+        except:
+            latest_news = "News feed unavailable."
         
-        # Technicals
-        rsi = safe_get(info, 'rsi', 50)
-        dma200 = safe_get(info, 'twoHundredDayAverage', cmp * 0.95)
-        beta = safe_get(info, 'beta', 1.0)
+        if pe != "N/A" and peg != "N/A" and peg > 0: eps_growth = pe / peg
+        else: eps_growth = 15
+            
+        if pe != "N/A" and roe != "N/A" and fwd_eps != "N/A":
+            fair_pe = min(sector_pe, roe * 2.0, eps_growth * 1.5, 45)
+            lt_target = round(fwd_eps * fair_pe, 2)
+            upside_lt = round(((lt_target - cmp) / cmp) * 100, 1) if cmp > 0 else "N/A"
+            upside_st = round(upside_lt * 0.35, 1) if upside_lt != "N/A" else "N/A"
+        else:
+            lt_target = "N/A"
+            upside_lt = "N/A"
+            upside_st = "N/A"
         
-        # Risk & Action Logic
+        rsi = clean_val(info.get('rsi'))
+        dma200 = clean_val(info.get('twoHundredDayAverage'))
+        beta = clean_val(info.get('beta'))
+        
         action = "BUY"
         risk = "BALANCED"
-        if roe < 8 or debt_eq > 1.5 or cmp < dma200: 
+        
+        if upside_lt != "N/A" and upside_lt > 300: return None 
+        
+        avoid_reasons = []
+        if roe != "N/A" and roe < 8: 
             action = "AVOID"
-            risk = "HIGH"
-        elif rsi > 70: 
+            avoid_reasons.append("Low Capital Efficiency (ROE < 8%)")
+        if debt_eq != "N/A" and debt_eq > 1.5: 
+            action = "AVOID"
+            avoid_reasons.append("High Debt Risk (D/E > 1.5)")
+        if dma200 != "N/A" and cmp < dma200: 
+            action = "AVOID"
+            avoid_reasons.append("Downtrend (Below 200 DMA)")
+        if rsi != "N/A" and rsi > 70: 
             action = "WAIT"
-            risk = "BALANCED"
-        elif beta > 1.3: risk = "AGGRESSIVE"
-        elif beta < 0.8: risk = "CONSERVATIVE"
+            avoid_reasons.append("Overbought Technicals (RSI > 70)")
+        if pe != "N/A" and sector_pe != "N/A" and pe > sector_pe * 1.5:
+            action = "WAIT"
+            avoid_reasons.append("Overvalued vs Sector peers")
+            
+        avoid_reason_str = " • ".join(avoid_reasons) if avoid_reasons else "None"
+        
+        if beta != "N/A":
+            if beta > 1.3: risk = "AGGRESSIVE"
+            elif beta < 0.8: risk = "CONSERVATIVE"
 
-        # Reasoning Generator
         reasons = []
-        if pe > 0 and pe < sector_pe * 0.8: reasons.append(f"Trades at {round((1-pe/sector_pe)*100)}% discount to historical.")
-        if roe > 18: reasons.append(f"Elite capital efficiency (ROE {round(roe, 1)}%).")
-        if debt_eq < 0.15: reasons.append("Virtually debt-free balance sheet.")
-        if cmp > dma200 and rsi < 60: reasons.append("Strong technical trend with RSI headroom.")
-        reasoning = " ".join(reasons[:2]) if reasons else "Standard quality metrics with stable valuation."
+        if pe != "N/A" and sector_pe != "N/A" and pe < sector_pe * 0.8: 
+            reasons.append(f"Trades at {round((1-pe/sector_pe)*100)}% discount to sector.")
+        if roe != "N/A" and roe > 18: 
+            reasons.append(f"Elite capital efficiency (ROE {round(roe, 1)}%).")
+        if debt_eq != "N/A" and debt_eq < 0.15: 
+            reasons.append("Virtually debt-free balance sheet.")
+        if dma200 != "N/A" and rsi != "N/A" and cmp > dma200 and rsi < 60: 
+            reasons.append("Strong technical trend with RSI headroom.")
+        reasoning = " ".join(reasons[:2]) if reasons else "Solid fundamentals but lacks extreme asymmetry."
 
         return {
             "id": ticker, "name": info.get('shortName', ticker), "ticker": ticker.replace('.NS', ''),
-            "sector": info.get('sector', 'Equities'), "cmp": round(cmp, 2), "pe": round(pe, 1), 
-            "roe": round(roe, 1), "debtEq": round(debt_eq, 2), "rsi": round(rsi), 
-            "dma200": round(dma200, 2), "upsideST": round(upside_st, 1), "upsideLT": round(upside_lt, 1), 
+            "sector": info.get('sector', 'Equities'), "cmp": round(cmp, 2), 
+            "pe": round(pe, 1) if pe != "N/A" else pe, 
+            "roe": round(roe, 1) if roe != "N/A" else roe, 
+            "debtEq": round(debt_eq, 2) if debt_eq != "N/A" else debt_eq, 
+            "rsi": round(rsi) if rsi != "N/A" else rsi, 
+            "dma200": round(dma200, 2) if dma200 != "N/A" else dma200, 
+            "low52": round(low52, 2) if low52 != "N/A" else low52,
+            "high52": round(high52, 2) if high52 != "N/A" else high52,
+            "upsideST": upside_st, "upsideLT": upside_lt, 
             "risk": risk, "stopLoss": round(cmp * 0.9, 2), "action": action, 
-            "ltTarget": round(lt_target, 2), "reasoning": reasoning
+            "ltTarget": lt_target, "reasoning": reasoning,
+            "avoidReason": avoid_reason_str, "news": latest_news
         }
     except Exception as e:
         return None
 
 def fetch_and_analyze():
-    print(f"Starting robust scan of {len(CORE_TICKERS)} Top Indian Equities...")
+    print(f"Starting robust scan of {len(MASSIVE_TICKER_LIST)} Top Indian Equities...")
     all_results = []
     
-    for i, ticker in enumerate(CORE_TICKERS):
+    for i, ticker in enumerate(MASSIVE_TICKER_LIST):
         res = analyze_stock(ticker)
         if res: all_results.append(res)
-        time.sleep(0.5) # Crucial: Prevents Yahoo Finance from blocking us
+        time.sleep(0.5) 
         
     print(f"Successfully analyzed {len(all_results)} stocks.")
     
-    # Sort by LT Upside and pick Top 50
-    all_results.sort(key=lambda x: x['upsideLT'], reverse=True)
+    def sort_key(x):
+        return x['upsideLT'] if isinstance(x['upsideLT'], (int, float)) else -9999
+        
+    all_results.sort(key=sort_key, reverse=True)
     final_50 = all_results[:50]
     
     with open('daily_picks.json', 'w') as f:
