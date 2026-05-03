@@ -34,8 +34,8 @@
     "sector": "Industrials",
     "cmp": 1675.5,
     "pe": 28.8,
-    "roe": 19.4,
-    "debtEq": 0.82,
+    "roe": 15.6,
+    "debtEq": 0.64,
     "rsi": "N/A",
     "dma200": 1442.5,
     "dma50": 1463.9,
@@ -53,7 +53,7 @@
     "avoidReason": "None",
     "risk": "CONSERVATIVE",
     "stopLoss": 1507.95,
-    "reasoning": "Elite capital efficiency (ROE 19.4%)."
+    "reasoning": "Solid fundamentals but lacks extreme asymmetry."
   },
   {
     "id": "ANURAS.NS",
@@ -343,7 +343,7 @@
     "cmp": 594.0,
     "pe": 30.0,
     "roe": "N/A",
-    "debtEq": 0.14,
+    "debtEq": 0.17,
     "rsi": "N/A",
     "dma200": 539.7,
     "dma50": 563.19,
@@ -361,7 +361,7 @@
     "avoidReason": "None",
     "risk": "BALANCED",
     "stopLoss": 534.6,
-    "reasoning": "Virtually debt-free balance sheet."
+    "reasoning": "Solid fundamentals but lacks extreme asymmetry."
   },
   {
     "id": "HFCL.NS",
@@ -379,8 +379,8 @@
     "dist50dma": 47.4,
     "low52": 59.82,
     "high52": 119.5,
-    "upsideLT": -37.3,
-    "ltTarget": 72.66,
+    "upsideLT": -34.8,
+    "ltTarget": 75.57,
     "ltAction": "AVOID",
     "stAction": "MOMENTUM",
     "stScore": 65,
