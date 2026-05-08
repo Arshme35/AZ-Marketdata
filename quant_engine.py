@@ -92,7 +92,7 @@ def analyze_stock(ticker):
         dma50 = clean_val(info.get('fiftyDayAverage'))
         rsi = clean_val(info.get('rsi'))
         
-        # Safe calculations (Bypasses missing volume issues)
+        # Safe calculations
         vol_surge = round(vol_today / vol_avg, 2) if vol_avg != "N/A" and vol_today != "N/A" and vol_avg > 0 else "N/A"
         dist_50dma = round(((cmp - dma50) / dma50) * 100, 1) if dma50 != "N/A" and dma50 > 0 else "N/A"
         
@@ -108,9 +108,8 @@ def analyze_stock(ticker):
             fair_pe = min(sector_pe, roe * 2.0, eps_growth * 1.5, 45)
             lt_target = round(fwd_eps * fair_pe, 2)
             upside_lt = round(((lt_target - cmp) / cmp) * 100, 1) if cmp > 0 else "N/A"
-            upside_st = round(upside_lt * 0.35, 1) if upside_lt != "N/A" else "N/A"
         else:
-            lt_target, upside_lt, upside_st = "N/A", "N/A", "N/A"
+            lt_target, upside_lt = "N/A", "N/A"
 
         # --- LONG TERM LOGIC ---
         lt_action = "BUY"
@@ -146,11 +145,10 @@ def analyze_stock(ticker):
         if dma200 != "N/A" and rsi != "N/A" and cmp > dma200 and rsi < 60: lt_reasons.append("Strong technical trend with RSI headroom.")
         reasoning = " ".join(lt_reasons[:2]) if lt_reasons else "Solid fundamentals but lacks extreme asymmetry."
 
-        # --- SHORT TERM / SWING LOGIC (Robust Top 20) ---
+        # --- SHORT TERM / SWING LOGIC ---
         st_reasons = []
         st_score = 0
         
-        # 1. Price Momentum (Proximity to 50 DMA)
         if dist_50dma != "N/A":
             if dist_50dma > 0:
                 st_score += 25
@@ -159,12 +157,10 @@ def analyze_stock(ticker):
                 st_score += 15
                 st_reasons.append("Consolidating near 50 DMA support.")
                 
-        # 2. Macro Trend
         if dma200 != "N/A" and cmp > dma200:
             st_score += 15
             st_reasons.append("Confirmed long-term uptrend.")
 
-        # 3. RSI Momentum (Goldilocks zone)
         if rsi != "N/A":
             if 55 <= rsi <= 72:
                 st_score += 35
@@ -173,7 +169,6 @@ def analyze_stock(ticker):
                 st_score += 10
                 st_reasons.append("RSI structure recovering.")
         
-        # 4. Volume Catalyst (If data exists)
         if vol_surge != "N/A" and vol_surge > 1.3:
             st_score += 25
             st_reasons.append(f"Heavy Volume Accumulation ({vol_surge}x Avg).")
@@ -208,14 +203,21 @@ def fetch_and_analyze():
         
     # --- 1. Top 20 Long Term Value ---
     def sort_lt(x): return x['upsideLT'] if isinstance(x['upsideLT'], (int, float)) else -9999
-    lt_results = sorted(all_results, key=sort_lt, reverse=True)[:20] # Strict TOP 20
+    
+    # NEW: Filter out "N/A" and zero/negative upside stocks BEFORE slicing
+    valid_lt = [x for x in all_results if isinstance(x['upsideLT'], (int, float)) and x['upsideLT'] > 0]
+    lt_results = sorted(valid_lt, key=sort_lt, reverse=True)[:20] 
+    
     with open('daily_picks.json', 'w') as f:
         json.dump(lt_results, f, indent=2)
 
     # --- 2. Top 20 Short Term Swing ---
     def sort_st(x): return x['stScore'] if isinstance(x['stScore'], (int, float)) else -9999
-    # Now it ranks securely by probability score regardless of volume glitches
-    st_results = sorted(all_results, key=sort_st, reverse=True)[:20] # Strict TOP 20
+    
+    # NEW: Filter out 0 score stocks so the table ONLY shows actual momentum setups
+    valid_st = [x for x in all_results if isinstance(x['stScore'], (int, float)) and x['stScore'] > 0]
+    st_results = sorted(valid_st, key=sort_st, reverse=True)[:20] 
+    
     with open('swing_picks.json', 'w') as f:
         json.dump(st_results, f, indent=2)
 
